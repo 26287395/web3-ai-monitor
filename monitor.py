@@ -1,15 +1,15 @@
 import feedparser
 import requests
 import os
-from google import genai # 必须使用新版 SDK 导入
+from google import genai  # 必须是这个新导入方式
 
-# 配置参数
+# 自动获取 Secrets
 TG_TOKEN = os.getenv("TG_TOKEN")
 TG_CHAT_ID = os.getenv("TG_CHAT_ID")
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 
 def ask_ai(news_content):
-    """使用 2026 年最新的 Gemini 2.0 Flash 模型"""
+    """使用 2026 最新 Gemini 2.0 接口"""
     client = genai.Client(api_key=GEMINI_KEY)
     
     prompt = f"""
@@ -18,14 +18,14 @@ def ask_ai(news_content):
     
     输出要求：
     1. 【要闻】列出 5 条最重磅动态，每条 30 字以内。
-    2. 每条要闻末尾标注来源：(CD) CoinDesk, (TB) The Block, (DC) Decrypt。
-    3. 【机会】对开发者 @meng_dev 提供 1 条具体的开发或推文建议。
+    2. 每条末尾标注来源：(CD) CoinDesk, (TB) The Block, (DC) Decrypt。
+    3. 【机会】对开发者 @meng_dev 提供 1 条具体的推文建议。
     4. 【情绪】一个中文词。
     
-    注意：禁止输出任何英文（术语除外），严禁废话。
+    注意：输出纯中文，禁止任何废话。
     """
     
-    # 调用 Gemini 2.0 Flash
+    # 切换到 2.0 Flash 模型
     response = client.models.generate_content(
         model="gemini-2.0-flash", 
         contents=prompt
@@ -63,20 +63,19 @@ def main():
             for entry in feed.entries[:5]: 
                 all_news += f"[{short_name}] {entry.title}\n"
         except Exception as e:
-            print(f"抓取 {short_name} 失败: {e}")
             continue
     
     if not all_news:
-        print("未抓取到资讯")
+        print("未抓取到内容")
         return
 
     try:
         analysis = ask_ai(all_news)
         final_msg = f"🚀 **Web3 全球情报汇总**\n\n{analysis}"
         send_tg(final_msg)
-        print("推送成功！正在使用 Gemini 2.0 Flash")
+        print("推送成功！使用的是 Gemini 2.0 Flash")
     except Exception as e:
-        print(f"AI 分析或发送失败: {e}")
+        print(f"执行失败: {e}")
 
 if __name__ == "__main__":
     main()
