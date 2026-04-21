@@ -10,9 +10,9 @@ TG_CHAT_ID = os.getenv("TG_CHAT_ID")
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 
 def ask_ai(news_content):
-    """带重试机制的 AI 调用 (适配 2026 模型矩阵)"""
-    # 强制指定 v1 稳定版路径
-    client = genai.Client(api_key=GEMINI_KEY, http_options={'api_version': 'v1'})
+    """适配 2026 稳定版 API 的 AI 调用"""
+    # 初始化客户端，不强制指定版本，让 SDK 自动处理
+    client = genai.Client(api_key=GEMINI_KEY)
     
     prompt = f"""
     你是一个 Web3 极简主义分析师。请将以下资讯压缩在 200 字以内的极简中文报告：
@@ -25,34 +25,29 @@ def ask_ai(news_content):
     4. 【情绪】一个中文词。
     """
 
-    # 2026 备选模型列表，按优先级尝试
-    models_to_try = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"]
+    # 2026 年当前最稳定的模型名称列表
+    models_to_try = ["gemini-2.0-flash", "gemini-2.0-flash-lite"]
     
-    max_retries = 5
+    max_retries = 3
     for attempt in range(max_retries):
         for model_name in models_to_try:
             try:
-                print(f"正在尝试模型: {model_name} (第 {attempt + 1} 次尝试)...")
+                print(f"正在尝试模型: {model_name}...")
                 response = client.models.generate_content(
                     model=model_name, 
                     contents=prompt
                 )
                 return response.text
             except Exception as e:
-                err_str = str(e)
-                if "503" in err_str or "429" in err_str:
-                    print(f"⚠️ {model_name} 暂时拥堵，准备重试...")
-                    continue
-                else:
-                    print(f"❌ 遇到非限制性错误: {e}")
-                    raise e
+                print(f"⚠️ 模型 {model_name} 报错: {e}")
+                continue
         
-        # 如果一轮模型都没通，等一会儿再试
-        wait_time = (attempt + 1) * 10
-        print(f"😴 全线拥堵，等待 {wait_time} 秒后重试...")
-        time.sleep(wait_time)
+        # 轮询失败后的重试等待
+        if attempt < max_retries - 1:
+            print(f"😴 正在等待重试 (第 {attempt + 1} 次)...")
+            time.sleep(10)
         
-    raise Exception("所有模型在多次重试后均不可用。")
+    raise Exception("所有可用模型均无法访问，请检查 API Key 权限。")
 
 def send_tg(message):
     footer = (
@@ -72,7 +67,7 @@ def send_tg(message):
     
     res = requests.post(url, json=payload, timeout=10)
     if res.status_code == 200:
-        print("✅ Telegram 消息已送达！")
+        print("✅ Telegram 消息发送成功！")
     else:
         print(f"❌ TG 发送失败: {res.text}")
 
@@ -93,7 +88,7 @@ def main():
             continue
     
     if not all_news:
-        print("未抓取到资讯")
+        print("⚠️ 未抓取到新闻数据。")
         return
 
     try:
