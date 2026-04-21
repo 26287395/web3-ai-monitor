@@ -2,20 +2,21 @@ name: Global Web3 AI Monitor
 
 on:
   schedule:
-    - cron: '0 */4 * * *'
+    - cron: '0 */4 * * *' # 每 4 小时运行一次
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # 升级到 v4
+      - uses: actions/checkout@v4
       - name: Set up Python
-        uses: actions/setup-python@v5 # 升级到 v5
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # 明确使用 3.11
+          python-version: '3.11' # 升级到 3.11，解决过时警告
       - name: Install dependencies
-        run: pip install feedparser requests google-genai # 注意这里换成了新库
+        run: |
+          pip install feedparser requests google-genai 
       - name: Run Script
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
