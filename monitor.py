@@ -1,16 +1,17 @@
 import feedparser
 import requests
 import os
+import time
 from google import genai
 
-# 从 GitHub Secrets 获取配置
+# 获取配置
 TG_TOKEN = os.getenv("TG_TOKEN")
 TG_CHAT_ID = os.getenv("TG_CHAT_ID")
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 
 def ask_ai(news_content):
-    """使用 2026 年主流模型 Gemini 2.5 Flash"""
-    # 强制指定 v1 稳定版路径，解决 404 问题
+    """带重试机制的 AI 调用 (适配 2026 模型矩阵)"""
+    # 强制指定 v1 稳定版路径
     client = genai.Client(api_key=GEMINI_KEY, http_options={'api_version': 'v1'})
     
     prompt = f"""
@@ -20,18 +21,40 @@ def ask_ai(news_content):
     输出要求：
     1. 【要闻】列出 5 条最重磅动态，每条 30 字以内。
     2. 每条末尾标注来源：(CD) CoinDesk, (TB) The Block, (DC) Decrypt。
-    3. 【机会】对开发者 @meng_dev 提供 1 条具体的开发或推文建议。
+    3. 【机会】对开发者 @meng_dev 提供 1 条具体的推文建议。
     4. 【情绪】一个中文词。
     """
+
+    # 2026 备选模型列表，按优先级尝试
+    models_to_try = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"]
     
-    response = client.models.generate_content(
-        model="gemini-2.5-flash", 
-        contents=prompt
-    )
-    return response.text
+    max_retries = 5
+    for attempt in range(max_retries):
+        for model_name in models_to_try:
+            try:
+                print(f"正在尝试模型: {model_name} (第 {attempt + 1} 次尝试)...")
+                response = client.models.generate_content(
+                    model=model_name, 
+                    contents=prompt
+                )
+                return response.text
+            except Exception as e:
+                err_str = str(e)
+                if "503" in err_str or "429" in err_str:
+                    print(f"⚠️ {model_name} 暂时拥堵，准备重试...")
+                    continue
+                else:
+                    print(f"❌ 遇到非限制性错误: {e}")
+                    raise e
+        
+        # 如果一轮模型都没通，等一会儿再试
+        wait_time = (attempt + 1) * 10
+        print(f"😴 全线拥堵，等待 {wait_time} 秒后重试...")
+        time.sleep(wait_time)
+        
+    raise Exception("所有模型在多次重试后均不可用。")
 
 def send_tg(message):
-    """发送消息并打印详细结果"""
     footer = (
         "\n\n🔗 **阅读原文：**\n"
         "• [CoinDesk](https://www.coindesk.com/)\n"
@@ -39,12 +62,6 @@ def send_tg(message):
         "• [Decrypt](https://decrypt.co/)"
     )
     full_text = message + footer
-    
-    # 打印即将发送的内容（用于调试）
-    print("\n--- [准备发送至 Telegram 的内容] ---")
-    print(full_text)
-    print("-----------------------------------\n")
-    
     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
     payload = {
         "chat_id": TG_CHAT_ID, 
@@ -53,17 +70,11 @@ def send_tg(message):
         "disable_web_page_preview": True
     }
     
-    try:
-        response = requests.post(url, json=payload, timeout=10)
-        # 打印 Telegram 服务器的反馈
-        if response.status_code == 200:
-            print(f"✅ Telegram 发送成功！响应详情: {response.text}")
-        else:
-            print(f"❌ Telegram 发送失败！错误码: {response.status_code}")
-            print(f"❌ 失败原因: {response.text}")
-            print(f"💡 提示：请检查 TG_TOKEN 是否正确，以及你是否给 Bot 发过 /start")
-    except Exception as e:
-        print(f"❌ 网络请求异常: {e}")
+    res = requests.post(url, json=payload, timeout=10)
+    if res.status_code == 200:
+        print("✅ Telegram 消息已送达！")
+    else:
+        print(f"❌ TG 发送失败: {res.text}")
 
 def main():
     sources = {
@@ -82,16 +93,14 @@ def main():
             continue
     
     if not all_news:
-        print("⚠️ 未抓取到任何新闻，请检查 RSS 源是否可用。")
+        print("未抓取到资讯")
         return
 
     try:
-        # AI 生成内容
         analysis = ask_ai(all_news)
-        # 执行发送操作
         send_tg(analysis)
     except Exception as e:
-        print(f"💥 脚本运行崩溃: {e}")
+        print(f"💥 最终执行失败: {e}")
 
 if __name__ == "__main__":
     main()
