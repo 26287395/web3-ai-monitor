@@ -4,14 +4,14 @@ import os
 import time
 from google import genai
 
-# 配置信息
+# 获取配置
 TG_TOKEN = os.getenv("TG_TOKEN")
 TG_CHAT_ID = os.getenv("TG_CHAT_ID")
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 
 def ask_ai(news_content):
-    """适配 2026 稳定版 API 的 AI 调用"""
-    # 初始化客户端（不手动指定 api_version，让 SDK 自动协商最优路径）
+    """使用 2026 年 4 月最稳的 Gemini 3 系列模型"""
+    # 2026 年 SDK 会自动处理版本，不再手动指定 v1beta
     client = genai.Client(api_key=GEMINI_KEY)
     
     prompt = f"""
@@ -25,23 +25,27 @@ def ask_ai(news_content):
     4. 【情绪】一个中文词。
     """
 
-    # 2026 年当前最稳模型列表
-    # 如果你的 Key 权限较高，也可以把 'gemini-2.0-pro' 加入列表
-    models_to_try = ["gemini-2.0-flash", "gemini-1.5-flash-002"]
+    # 2026 年 4 月当前 Free Tier 建议模型列表
+    # gemini-3.1-flash-lite-preview 是目前最不容易报 429 的“工作马”模型
+    models_to_try = [
+        "gemini-3.1-flash-lite-preview", 
+        "gemini-3-flash-preview",
+        "gemini-2.5-pro" # 备选
+    ]
     
     for model_name in models_to_try:
         try:
-            print(f"正在尝试调用模型: {model_name}...")
+            print(f"正在尝试 2026 核心模型: {model_name}...")
             response = client.models.generate_content(
                 model=model_name, 
                 contents=prompt
             )
             return response.text
         except Exception as e:
-            print(f"⚠️ 模型 {model_name} 暂时无法访问: {e}")
+            print(f"⚠️ 模型 {model_name} 暂时不可用 (报错: {e})")
             continue
         
-    raise Exception("所有预设模型均 404 或不可用，请确认 Google AI Studio 中模型是否已更名。")
+    raise Exception("所有 2026 预设模型均无法访问。请检查 Google AI Studio 是否有新的模型更名公告。")
 
 def send_tg(message):
     footer = (
@@ -63,7 +67,7 @@ def send_tg(message):
     if res.status_code == 200:
         print("✅ Telegram 消息发送成功！")
     else:
-        print(f"❌ TG 发送失败: {res.text}")
+        print(f"❌ TG 发送失败: {res.text}，请确认 TG_CHAT_ID 是否为数字且给 Bot 发过 /start")
 
 def main():
     sources = {
