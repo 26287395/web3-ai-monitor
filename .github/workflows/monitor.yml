@@ -2,7 +2,7 @@ name: Global Web3 AI Monitor
 
 on:
   schedule:
-    - cron: '0 */4 * * *' # 每 4 小时运行一次
+    - cron: '0 */4 * * *'
   workflow_dispatch:
 
 jobs:
@@ -13,10 +13,10 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # 升级到 3.11，解决过时警告
+          python-version: '3.11'
       - name: Install dependencies
         run: |
-          pip install feedparser requests google-genai 
+          pip install feedparser requests google-genai
       - name: Run Script
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
