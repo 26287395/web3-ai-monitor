@@ -4,14 +4,14 @@ import os
 import time
 from google import genai
 
-# 获取配置
+# 配置信息
 TG_TOKEN = os.getenv("TG_TOKEN")
 TG_CHAT_ID = os.getenv("TG_CHAT_ID")
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 
 def ask_ai(news_content):
     """适配 2026 稳定版 API 的 AI 调用"""
-    # 初始化客户端，不强制指定版本，让 SDK 自动处理
+    # 初始化客户端（不手动指定 api_version，让 SDK 自动协商最优路径）
     client = genai.Client(api_key=GEMINI_KEY)
     
     prompt = f"""
@@ -21,33 +21,27 @@ def ask_ai(news_content):
     输出要求：
     1. 【要闻】列出 5 条最重磅动态，每条 30 字以内。
     2. 每条末尾标注来源：(CD) CoinDesk, (TB) The Block, (DC) Decrypt。
-    3. 【机会】对开发者 @meng_dev 提供 1 条具体的推文建议。
+    3. 【机会】对开发者 @meng_dev 提供 1 条具体的开发或推文建议。
     4. 【情绪】一个中文词。
     """
 
-    # 2026 年当前最稳定的模型名称列表
-    models_to_try = ["gemini-2.0-flash", "gemini-2.0-flash-lite"]
+    # 2026 年当前最稳模型列表
+    # 如果你的 Key 权限较高，也可以把 'gemini-2.0-pro' 加入列表
+    models_to_try = ["gemini-2.0-flash", "gemini-1.5-flash-002"]
     
-    max_retries = 3
-    for attempt in range(max_retries):
-        for model_name in models_to_try:
-            try:
-                print(f"正在尝试模型: {model_name}...")
-                response = client.models.generate_content(
-                    model=model_name, 
-                    contents=prompt
-                )
-                return response.text
-            except Exception as e:
-                print(f"⚠️ 模型 {model_name} 报错: {e}")
-                continue
+    for model_name in models_to_try:
+        try:
+            print(f"正在尝试调用模型: {model_name}...")
+            response = client.models.generate_content(
+                model=model_name, 
+                contents=prompt
+            )
+            return response.text
+        except Exception as e:
+            print(f"⚠️ 模型 {model_name} 暂时无法访问: {e}")
+            continue
         
-        # 轮询失败后的重试等待
-        if attempt < max_retries - 1:
-            print(f"😴 正在等待重试 (第 {attempt + 1} 次)...")
-            time.sleep(10)
-        
-    raise Exception("所有可用模型均无法访问，请检查 API Key 权限。")
+    raise Exception("所有预设模型均 404 或不可用，请确认 Google AI Studio 中模型是否已更名。")
 
 def send_tg(message):
     footer = (
