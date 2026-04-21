@@ -3,14 +3,14 @@ import requests
 import os
 from google import genai
 
-# 获取配置信息
+# 获取配置
 TG_TOKEN = os.getenv("TG_TOKEN")
 TG_CHAT_ID = os.getenv("TG_CHAT_ID")
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 
 def ask_ai(news_content):
-    """调用 Gemini 1.5 Flash 生成极简中文总结"""
-    # 初始化客户端
+    """调用 Gemini 1.5 Flash 稳定版"""
+    # 2026 最新标准初始化
     client = genai.Client(api_key=GEMINI_KEY)
     
     prompt = f"""
@@ -22,11 +22,9 @@ def ask_ai(news_content):
     2. 每条末尾标注来源：(CD) CoinDesk, (TB) The Block, (DC) Decrypt。
     3. 【机会】对开发者 @meng_dev 提供 1 条具体的开发或推文建议。
     4. 【情绪】一个中文词。
-    
-    注意：禁止输出任何英文（术语除外），严禁废话。
     """
     
-    # 使用配额最稳定的 1.5-flash 模型
+    # 使用最稳的模型标识符
     response = client.models.generate_content(
         model="gemini-1.5-flash", 
         contents=prompt
@@ -34,7 +32,6 @@ def ask_ai(news_content):
     return response.text
 
 def send_tg(message):
-    """发送消息到 Telegram"""
     footer = (
         "\n\n🔗 **阅读原文：**\n"
         "• [CoinDesk](https://www.coindesk.com/)\n"
@@ -51,7 +48,6 @@ def send_tg(message):
     requests.post(url, json=payload)
 
 def main():
-    # 定义多个信源
     sources = {
         "CD": "https://www.coindesk.com/arc/outboundfeeds/rss/",
         "TB": "https://www.theblock.co/rss.xml",
@@ -64,7 +60,7 @@ def main():
             feed = feedparser.parse(url)
             for entry in feed.entries[:5]: 
                 all_news += f"[{short_name}] {entry.title}\n"
-        except Exception:
+        except:
             continue
     
     if not all_news:
@@ -72,11 +68,10 @@ def main():
         return
 
     try:
-        # AI 分析并推送
         analysis = ask_ai(all_news)
         final_msg = f"🚀 **Web3 全球情报汇总**\n\n{analysis}"
         send_tg(final_msg)
-        print("推送成功！正在使用 Gemini 1.5 Flash")
+        print("推送成功！")
     except Exception as e:
         print(f"执行失败: {e}")
 
