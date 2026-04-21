@@ -1,0 +1,24 @@
+name: Global Web3 AI Monitor
+
+on:
+  schedule:
+    - cron: '0 */4 * * *' # 每 4 小时触发一次
+  workflow_dispatch: # 支持手动点击按钮触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: pip install feedparser requests google-generativeai
+      - name: Run AI Monitor
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+        run: python monitor.py
