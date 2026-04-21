@@ -9,9 +9,9 @@ TG_CHAT_ID = os.getenv("TG_CHAT_ID")
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 
 def ask_ai(news_content):
-    """调用 Gemini 1.5 Flash 稳定版"""
-    # 2026 最新标准初始化
-    client = genai.Client(api_key=GEMINI_KEY)
+    """使用 2026 年最新主流模型：Gemini 2.5 Flash"""
+    # 强制指定 v1 稳定版路径，避免 SDK 默认去碰 v1beta
+    client = genai.Client(api_key=GEMINI_KEY, http_options={'api_version': 'v1'})
     
     prompt = f"""
     你是一个 Web3 极简主义分析师。请将以下资讯压缩在 200 字以内的极简中文报告：
@@ -24,9 +24,9 @@ def ask_ai(news_content):
     4. 【情绪】一个中文词。
     """
     
-    # 使用最稳的模型标识符
+    # 2026 年最稳型号是 gemini-2.5-flash，1.5 已经被部分地区下架
     response = client.models.generate_content(
-        model="gemini-1.5-flash", 
+        model="gemini-2.5-flash", 
         contents=prompt
     )
     return response.text
@@ -68,10 +68,11 @@ def main():
         return
 
     try:
+        # AI 分析并推送
         analysis = ask_ai(all_news)
         final_msg = f"🚀 **Web3 全球情报汇总**\n\n{analysis}"
         send_tg(final_msg)
-        print("推送成功！")
+        print("推送成功！使用的是 Gemini 2.5 Flash (v1 稳定版)")
     except Exception as e:
         print(f"执行失败: {e}")
 
