@@ -10,8 +10,8 @@ TG_CHAT_ID = os.getenv("TG_CHAT_ID")
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 
 def ask_ai(news_content):
-    """适配 2026 年 4 月配额最稳的模型"""
-    # 强制走 v1 稳定路径，不再尝试 v1beta
+    """适配 2026 年 4 月配额最稳的模型矩阵"""
+    # 强制锁定 v1 稳定版路径，避免被重定向至已失效的测试接口
     client = genai.Client(api_key=GEMINI_KEY, http_options={'api_version': 'v1'})
     
     prompt = f"""
@@ -25,12 +25,12 @@ def ask_ai(news_content):
     4. 【情绪】一个中文词。
     """
 
-    # 2026 年当前 Free Tier 建议模型列表
-    # gemini-3.1-flash-lite 是目前最不容易报 429 的模型
+    # 2026 年当前 Free Tier 建议模型优先级
+    # gemini-3.1-flash-lite 是目前官方主推的低功耗、高配额模型
     models_to_try = [
         "gemini-3.1-flash-lite", 
-        "gemini-3.0-flash",
-        "gemini-1.5-flash-002"
+        "gemini-1.5-flash-002", # 必须带后缀 002 才能在 v1 路径识别
+        "gemini-2.0-flash-exp"
     ]
     
     for model_name in models_to_try:
@@ -42,10 +42,11 @@ def ask_ai(news_content):
             )
             return response.text
         except Exception as e:
-            print(f"⚠️ 模型 {model_name} 报错: {e}")
+            # 捕获 429 并打印，方便观察是否触发频率限制
+            print(f"⚠️ 模型 {model_name} 暂时不可用 (报错: {e})")
             continue
         
-    raise Exception("所有 2026 预设模型均无法访问。请确认 Google AI Studio 是否有新的模型更名公告。")
+    raise Exception("所有 2026 预设模型均无法访问。请检查 API Key 是否有效。")
 
 def send_tg(message):
     footer = (
@@ -55,7 +56,7 @@ def send_tg(message):
         "• [Decrypt](https://decrypt.co/)"
     )
     
-    # 转义 Markdown 敏感字符防止 400 错误
+    # 核心修复：转义 Markdown 特殊字符，防止 Telegram 报 400 错误
     safe_message = message.replace("_", "\\_").replace("*", "\\*")
     full_text = safe_message + footer
     
@@ -68,8 +69,10 @@ def send_tg(message):
     }
     
     res = requests.post(url, json=payload, timeout=15)
+    
+    # 如果 Markdown 解析失败，自动切换为纯文本重发
     if res.status_code != 200:
-        print(f"⚠️ Markdown 失败，尝试纯文本发送...")
+        print(f"⚠️ Markdown 发送失败，尝试纯文本模式...")
         payload.pop("parse_mode")
         res = requests.post(url, json=payload, timeout=15)
         
@@ -95,14 +98,14 @@ def main():
             continue
     
     if not all_news:
-        print("⚠️ 未抓取到新闻数据。")
+        print("⚠️ 未抓取到新闻，RSS 源可能被反爬。")
         return
 
     try:
         analysis = ask_ai(all_news)
         send_tg(analysis)
     except Exception as e:
-        print(f"💥 最终执行失败: {e}")
+        print(f"💥 运行崩溃: {e}")
 
 if __name__ == "__main__":
     main()
